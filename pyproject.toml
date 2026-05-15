@@ -1,0 +1,9 @@
+[project]
+name = "fly-in"
+version = "0.1.0"
+description = """System that efficiently routes a fleet of drones from a central
+base (start) to a target location (end), while navigating this dynamic network under
+a set of strict constraints and optimization goals."""
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
