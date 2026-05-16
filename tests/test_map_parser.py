@@ -13,8 +13,7 @@ def test_empty(tmp_path: pathlib.Path):
 
 def test_valide_first_line(tmp_path: pathlib.Path):
     tmp = tmp_path / "map.txt"
-    tmp.write_text("""
-# comment
+    tmp.write_text("""# comment
 nb_drones: 10
 
 start_hub: start 0 0
