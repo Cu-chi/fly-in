@@ -1,6 +1,15 @@
+from map import Map
+from map_parser import MapParser, MapParsingError
+
+
 def main() -> None:
-    return
+    with MapParser("maps/test.txt") as map_parse:
+        print(map_parse)
+    # map: Map = map_parser.map
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except MapParsingError as e:
+        print(f"line {e.line}: {e.error}")
