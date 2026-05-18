@@ -37,6 +37,7 @@ class MapParser():
             match node_type:
                 case "nb_drones":
                     self.validate_nb_drones(id, node_params)
+                
             if first_line and node_type != "nb_drones":
                 raise MapParsingError(id, " first line must define the "
                                       "number of drones using "
@@ -53,9 +54,11 @@ class MapParser():
         if self.nb_drones is None:
             try:
                 self.nb_drones = int(node_params[0])
+                if self.nb_drones < 0:
+                    raise Exception
             except Exception:
                 raise MapParsingError(id, "nb_drones must be "
-                                      "an integer")
+                                      "a positive integer")
         else:
             raise MapParsingError(id, "nb_drones is already set")
 
