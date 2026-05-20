@@ -103,7 +103,7 @@ class MapParser():
                     except ValueError:
                         raise MapParsingError(id, "max_link_capacity must"
                                               " be positive integer")
-                    if max_link_capacity < 0:
+                    if max_link_capacity <= 0:
                         raise MapParsingError(id, "max_link_capacity must"
                                               " be positive integer")
                 case "max_drones":
@@ -112,7 +112,7 @@ class MapParser():
                     except ValueError:
                         raise MapParsingError(id, "max_drones must"
                                               " be positive integer")
-                    if max_drones < 0:
+                    if max_drones <= 0:
                         raise MapParsingError(id, "max_drones must"
                                               " be positive integer")
                 case "zone":
