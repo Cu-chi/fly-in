@@ -3,7 +3,7 @@ import pytest
 import pathlib
 
 
-def test_empty(tmp_path: pathlib.Path):
+def test_empty(tmp_path: pathlib.Path) -> None:
     tmp = tmp_path / "empty.txt"
     tmp.touch()
     with pytest.raises(MapParsingError):
@@ -11,7 +11,7 @@ def test_empty(tmp_path: pathlib.Path):
             pass
 
 
-def test_nb_drones_valide_first_line(tmp_path: pathlib.Path):
+def test_nb_drones_valide_first_line(tmp_path: pathlib.Path) -> None:
     tmp = tmp_path / "map.txt"
     tmp.write_text("""# comment
 nb_drones: 10
@@ -22,7 +22,7 @@ start_hub: start 0 0
         assert map_parse.nb_drones == 10
 
 
-def test_nb_drones_wrong(tmp_path: pathlib.Path):
+def test_nb_drones_wrong(tmp_path: pathlib.Path) -> None:
     tmp = tmp_path / "map.txt"
     tmp.write_text("""# comment
 nb_drones: 10 [meta]
@@ -34,7 +34,7 @@ start_hub: start 0 0
             pass
 
 
-def test_wrong_nb_drones(tmp_path: pathlib.Path):
+def test_wrong_nb_drones(tmp_path: pathlib.Path) -> None:
     tmp = tmp_path / "map.txt"
     tmp.write_text("""# comment
 nb_drones: 10 [meta]
@@ -46,7 +46,7 @@ start_hub: start 0 0
             pass
 
 
-def test_nb_drones_neg_int(tmp_path: pathlib.Path):
+def test_nb_drones_neg_int(tmp_path: pathlib.Path) -> None:
     tmp = tmp_path / "map.txt"
     tmp.write_text("""# comment
 nb_drones: -10
@@ -58,7 +58,7 @@ start_hub: start 0 0
             pass
 
 
-def test_start_hub_valid(tmp_path: pathlib.Path):
+def test_start_hub_valid(tmp_path: pathlib.Path) -> None:
     tmp = tmp_path / "map.txt"
     tmp.write_text("""# comment
 nb_drones: 10
@@ -66,4 +66,16 @@ nb_drones: 10
 start_hub: start 0 0
 """)
     with MapParser(str(tmp)) as map_parser:
-        assert map_parser.start_hub.name == "start"
+        assert map_parser.start_hub and map_parser.start_hub.name == "start"
+
+
+def test_end_hub_valid(tmp_path: pathlib.Path) -> None:
+    tmp = tmp_path / "map.txt"
+    tmp.write_text("""# comment
+nb_drones: 10
+
+start_hub: start 0 0
+end_hub: end 0 0
+""")
+    with MapParser(str(tmp)) as map_parser:
+        assert map_parser.end_hub and map_parser.end_hub.name == "end"

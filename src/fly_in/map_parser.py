@@ -1,5 +1,6 @@
-from fly_in.map import Node, Metadata, Color, Zone
+from fly_in.map import Node, Metadata, Color, Zone, Connection
 from typing import Any
+from types import TracebackType
 
 
 class MapParsingError(Exception):
@@ -16,7 +17,7 @@ class MapParser():
         self.start_hub: Node | None = None
         self.end_hub: Node | None = None
         self.hubs: list[Node] = []
-        self.connections: set[tuple[Node, Node]] = set()
+        self.connections: set[Connection] = set()
 
     def __enter__(self) -> 'MapParser':
         self.file = open(self.filename, "r")
@@ -41,11 +42,11 @@ class MapParser():
             return line, ""
         return line[:opening], line[opening + 1:closing].strip()
 
-    def _is_name_taken(self, name: str) -> bool:
+    def _get_node_from_name(self, name: str) -> Node | None:
         for hub in self.hubs:
             if hub.name == name:
-                return True
-        return False
+                return hub
+        return None
 
     def _are_coords_taken(self, x: int, y: int) -> bool:
         if self.start_hub and self.start_hub.x == x and self.start_hub.y == y:
@@ -58,42 +59,78 @@ class MapParser():
         return False
 
     @staticmethod
-    def _parse_metadata(id: int, metadata_str: str) -> Metadata:
+    def _parse_metadata(id: int, hub: bool, metadata_str: str) -> Metadata:
+        if not metadata_str:
+            return Metadata(None, None, None, None)
         split = metadata_str.split(" ")
-        metadata = Metadata(Zone.NORMAL, None, 1, 1)
         key: str
         value: str
+        color: Color | None = None
+        max_link_capacity: int | None = None
+        max_drones: int | None = None
+        zone: Zone | None = None
+        already_set: list[str] = []
+        valid_keys: list[str] = ["color", "max_drones", "zone"]
+        if not hub:
+            valid_keys = ["max_link_capacity"]
         for kv in split:
-            key, value = kv.split("=")
+            if "=" not in kv:
+                raise MapParsingError(id, "metadata doesn't respect the "
+                                      "format: 'key=value'")
+            key, value, *rest = kv.split("=")
+            if key not in valid_keys:
+                raise MapParsingError(id, f"metadata key '{key}' isn't valid "
+                                      f"for {"hub" if hub else "connection"} "
+                                      "key")
+            if len(rest) > 0:
+                raise MapParsingError(id, "metadata doesn't respect the "
+                                      "format: 'key=value'")
+            if key not in already_set:
+                already_set.append(key)
+            else:
+                raise MapParsingError(id, f"metadata key '{key}' is already "
+                                      "set")
             match key:
                 case "color":
-                    color: Color | None = Color.get_color(value.lower())
+                    color = Color.get_color(value.lower())
                     if not color:
                         raise MapParsingError(id, f"color '{value}' is not "
                                               "valid, must "
                                               f"be in {Color._member_names_}")
-                    metadata.color = color
                 case "max_link_capacity":
-                    metadata.max_link_capacity = int(value)
-                    if metadata.max_link_capacity < 0:
+                    try:
+                        max_link_capacity = int(value)
+                    except ValueError:
+                        raise MapParsingError(id, "max_link_capacity must"
+                                              " be positive integer")
+                    if max_link_capacity < 0:
                         raise MapParsingError(id, "max_link_capacity must"
                                               " be positive integer")
                 case "max_drones":
-                    metadata.max_drones = int(value)
-                    if metadata.max_drones < 0:
+                    try:
+                        max_drones = int(value)
+                    except ValueError:
+                        raise MapParsingError(id, "max_drones must"
+                                              " be positive integer")
+                    if max_drones < 0:
                         raise MapParsingError(id, "max_drones must"
                                               " be positive integer")
                 case "zone":
-                    zone: Zone | None = Zone.get_zone(value.lower())
+                    zone = Zone.get_zone(value.lower())
                     if not zone:
                         raise MapParsingError(id, f"zone '{value}' is not "
                                               "valid, must "
                                               f"be in {Zone._member_names_}")
-                    metadata.zone = zone
                 case default:
                     raise MapParsingError(id, f"metadata key '{default}' is "
                                           "not supported")
-        return metadata
+            already_set.append(key)
+        return Metadata(
+            zone,
+            color,
+            max_link_capacity,
+            max_drones
+        )
 
     def _parser(self) -> None:
         node_type: str
@@ -122,6 +159,8 @@ class MapParser():
                 case "hub":
                     self.validate_hub(id, "hub",
                                       node_params, metadata_str)
+                case "connection":
+                    self.validate_connection(id, node_params, metadata_str)
             if first_line and node_type != "nb_drones":
                 raise MapParsingError(id, " first line must define the "
                                       "number of drones using "
@@ -156,8 +195,8 @@ class MapParser():
     def validate_hub(self, id: int, hub_type: str,
                      node_params: list[str], metadata_str: str) -> None:
         if len(node_params) != 3:
-            raise MapParsingError(id, f"{hub_type} must have "
-                                  f" 3 arguments: '{hub_type}: <name> <x> <y>'")
+            raise MapParsingError(id, f"{hub_type} must have 3 arguments: "
+                                  f"'{hub_type}: <name> <x> <y>'")
         if (hub_type == "start_hub" and self.start_hub) \
            or (hub_type == "end_hub" and self.end_hub):
             raise MapParsingError(id, f"{hub_type} is already set")
@@ -169,7 +208,7 @@ class MapParser():
             raise MapParsingError(id, "x and y must be integers")
         if not name.isalnum():
             raise MapParsingError(id, "hub name must be alpha-numerical")
-        if self._is_name_taken(name):
+        if self._get_node_from_name(name):
             raise MapParsingError(id, f"name '{name}' is taken")
         if self._are_coords_taken(x, y):
             raise MapParsingError(id, f"coords {x},{y} are already taken")
@@ -177,17 +216,51 @@ class MapParser():
         if hub_type == "start_hub":
             self.start_hub = Node(name,
                                   x, y,
-                                  self._parse_metadata(id, metadata_str))
+                                  self._parse_metadata(id, True, metadata_str))
             self.hubs.append(self.start_hub)
         elif hub_type == "end_hub":
             self.end_hub = Node(name,
                                 x, y,
-                                self._parse_metadata(id, metadata_str))
+                                self._parse_metadata(id, True, metadata_str))
             self.hubs.append(self.end_hub)
         else:
             self.hubs.append(Node(name,
                              x, y,
-                             self._parse_metadata(id, metadata_str)))
+                             self._parse_metadata(id, True, metadata_str)))
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def validate_connection(self, id: int,
+                            node_params: list[str], metadata_str: str) -> None:
+        if len(node_params) != 1:
+            raise MapParsingError(id, "connection must have only"
+                                  " ONE argument without metadata")
+        connection_split: list[str] = node_params[0].split("-", 1)
+        name1: str = connection_split[0]
+        name2: str = connection_split[1]
+        node1: Node | None = self._get_node_from_name(name1)
+        node2: Node | None = self._get_node_from_name(name2)
+        if not node1:
+            raise MapParsingError(id, f"connection name '{name1}' must be "
+                                  "in hubs")
+        if not node2:
+            raise MapParsingError(id, f"connection name '{name2}' must be "
+                                  "in hubs")
+        new_connection: Connection = Connection(
+            node1,
+            node2,
+            self._parse_metadata(id, False, metadata_str)
+        )
+        if new_connection in self.connections:
+            raise MapParsingError(id, f"connection between {name1} and {name2}"
+                                  " already exists")
+        self.connections.add(new_connection)
+        try:
+            pass
+        except Exception:
+            raise MapParsingError(id, "nb_drones must be "
+                                  "a positive integer")
+
+    def __exit__(self,
+                 exc_type: type[BaseException] | None,
+                 exc: BaseException | None,
+                 tb: TracebackType | None) -> None:
         self.file.close()

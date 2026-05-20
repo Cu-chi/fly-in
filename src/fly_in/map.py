@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Any
 from enum import Enum, auto
 
 
@@ -48,7 +48,7 @@ class Color(Enum):
                 return None
 
 
-@dataclass
+@dataclass(frozen=True)
 class Metadata:
     zone: Optional[Zone]
     color: Optional[Color]
@@ -56,7 +56,7 @@ class Metadata:
     max_drones: Optional[int]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Node:
     name: str
     x: int
@@ -64,11 +64,20 @@ class Node:
     metadata: Metadata
 
 
-@dataclass
+@dataclass(frozen=True)
 class Connection:
-    name1: Node
-    name2: Node
+    node1: Node
+    node2: Node
     metadata: Metadata
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, Connection):
+            return NotImplemented
+        return frozenset([self.node1,
+                          self.node2]) == frozenset([other.node1, other.node2])
+
+    def __hash__(self) -> int:
+        return hash(frozenset([self.node1, self.node2]))
 
 
 class Map():
