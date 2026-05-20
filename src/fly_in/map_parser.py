@@ -253,11 +253,6 @@ class MapParser():
             raise MapParsingError(id, f"connection between {name1} and {name2}"
                                   " already exists")
         self.connections.add(new_connection)
-        try:
-            pass
-        except Exception:
-            raise MapParsingError(id, "nb_drones must be "
-                                  "a positive integer")
 
     def __exit__(self,
                  exc_type: type[BaseException] | None,
