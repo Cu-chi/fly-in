@@ -239,6 +239,9 @@ class MapParser():
             raise MapParsingError(id, "connection must have only"
                                   " ONE argument without metadata")
         connection_split: list[str] = node_params[0].split("-", 1)
+        if len(connection_split) < 2:
+            raise MapParsingError(id, "connection doesn't respect the "
+                                  "format: 'connection: name1-name2'")
         name1: str = connection_split[0]
         name2: str = connection_split[1]
         node1: Node | None = self._get_node_from_name(name1)
