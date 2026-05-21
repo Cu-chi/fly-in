@@ -141,8 +141,8 @@ class MapParser():
         metadata_str: str
         first_line: bool = True
         for id, line in enumerate(self.file, start=1):
-            line = line.strip()
-            if line.startswith("#") or not line:
+            line = line.split('#')[0].strip()
+            if not line:
                 continue
             if line.count(":") != 1:
                 raise MapParsingError(id, "line doesn't respect the "
