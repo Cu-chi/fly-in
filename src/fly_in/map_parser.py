@@ -65,7 +65,7 @@ class MapParser():
     def _parse_metadata(id: int, hub: bool, metadata_str: str) -> Metadata:
         if not metadata_str:
             return Metadata(None, None, None, None)
-        split = metadata_str.split(" ")
+        split = metadata_str.split()
         key: str
         value: str
         color: str | None = None
