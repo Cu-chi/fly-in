@@ -10,7 +10,7 @@ run:
 	uv run python $(MAIN) $(ARGS)
 
 test:
-	uv run pytest
+	uv run python -m pytest -v
 
 debug:
 	uv run python -m pdb $(MAIN) $(ARGS)
