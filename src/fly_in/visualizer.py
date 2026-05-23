@@ -34,14 +34,14 @@ class VNode(pygame.sprite.Sprite):
 
         self.rect = self.image.get_rect(center=(screen_x, screen_y))
         self.text_surface = font.render(node.name,
-                                        True, (255, 255, 255), 255)
+                                        True, (255, 255, 255))
         self.text_rect = self.text_surface.get_rect()
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.blit(self.image, self.rect)
         screen.blit(self.text_surface, self.text_rect)
 
-    def update(self, x: int, y: int, scale: float) -> None:
+    def update(self, x: int, y: int) -> None:
         self.rect.x = x
         self.rect.y = y
         self.text_rect.centerx = self.rect.centerx
@@ -49,19 +49,33 @@ class VNode(pygame.sprite.Sprite):
 
 
 class VConnection(pygame.sprite.Sprite):
-    def __init__(self, connection: Connection, *groups: Any):
+    def __init__(self, connection: Connection,
+                 font: pygame.font.Font, *groups: Any):
         super().__init__(*groups)
         self.connection = connection
 
         self.color = pygame.Color(255, 255, 255)
+        self.font = font
+        self.description = "0 drones"
+        self.text_surface = font.render(self.description,
+                                        True, (255, 255, 255))
+        self.text_rect = self.text_surface.get_rect()
+        self.mid_line: tuple[int, int] = (0, 0)
+
+    def update_text(self, text: str) -> None:
+        self.description = text
+        self.text_surface = self.font.render(self.description, True,
+                                             (255, 255, 255))
+        self.text_rect = self.text_surface.get_rect(center=self.mid_line)
 
     def draw(self, surface: pygame.Surface, x1: int, y1: int,
              x2: int, y2: int, scale: float) -> None:
-        new_width: int = int(1 * scale)
-        if new_width <= 0:
-            new_width = 1
+        new_width: int = max(1, int(1 * scale))
+        self.mid_line = ((x1 + x2) // 2, (y1 + y2) // 2)
+        self.text_rect.center = self.mid_line
         pygame.draw.line(surface, self.color,
                          (x1, y1), (x2, y2), new_width)
+        surface.blit(self.text_surface, self.text_rect)
 
 
 class Visualizer():
@@ -71,10 +85,12 @@ class Visualizer():
         self.scale = 1.0
         video_info: pygame.display._VidInfo = pygame.display.Info()
         pygame.display.set_caption("fly-in visualizer")
-        self.screen = pygame.display.set_mode((video_info.current_w // 2,
-                                               video_info.current_h // 2))
+        self.screen = pygame.display.set_mode(
+            (video_info.current_w // 2, video_info.current_h // 2),
+            pygame.RESIZABLE)
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("Arial", 16, True)
+        self.font = pygame.font.SysFont("Arial", 16)
+        self.font_small = pygame.font.SysFont("Arial", 10)
         self.vnodes: dict[str, VNode] = {}
         self.offset_x = 0
         self.offset_y = 0
@@ -83,7 +99,7 @@ class Visualizer():
             self.vnodes.update({hub.name: VNode(hub, x, y, self.font)})
         self.vconnections: list[VConnection] = []
         for connection in connections:
-            self.vconnections.append(VConnection(connection))
+            self.vconnections.append(VConnection(connection, self.font_small))
 
         self.hubs = hubs
         self.connections = connections
@@ -122,7 +138,7 @@ class Visualizer():
 
             for vnode in self.vnodes.values():
                 x, y = self._normalize_pos(vnode.node)
-                vnode.update(x, y, self.scale)
+                vnode.update(x, y)
                 vnode.draw(self.screen)
 
             pygame.display.flip()
