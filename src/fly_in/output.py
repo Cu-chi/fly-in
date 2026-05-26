@@ -1,0 +1,42 @@
+from fly_in.simulation import Path
+from fly_in.map_types import Connection, Node
+
+
+class Output:
+    def __init__(self, drones_paths: dict[int, Path]) -> None:
+        self.set_drones_paths(drones_paths)
+
+    def set_drones_paths(self, drones_paths: dict[int, Path]) -> None:
+        self.__drones_paths = drones_paths
+
+    def from_positions_print_turns(self,
+                                   positions: list[
+                                       dict[int, Node | Connection]]) -> None:
+        for step_data in positions:
+            turn: str = ""
+            for drone_id, last_pos in step_data.items():
+                turn += f" D{drone_id}-"
+                if isinstance(last_pos, Node):
+                    turn += last_pos.name
+                elif isinstance(last_pos, Connection):
+                    turn += f"{last_pos.node1.name}"f"-{last_pos.node2.name}"
+            print(turn.strip())
+
+    def generate_list_of_positions(self) -> list[dict[int, Node | Connection]]:
+        path_found = True
+        step = 0
+        positions: list[dict[int, Node | Connection]] = []
+        while path_found:
+            path_found = False
+            for drone_id in self.__drones_paths:
+                path: Path = list(filter(lambda p: p[1] == step,
+                                         self.__drones_paths[drone_id]))
+                if not path:
+                    continue
+                if len(positions) - 1 < step:
+                    positions.append({})
+                path_found = True
+                last_pos: Node | Connection = path[-1][0]
+                positions[step][drone_id] = last_pos
+            step += 1
+        return positions

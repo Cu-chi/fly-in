@@ -5,7 +5,8 @@ from fly_in.map_types import Node, Connection, Zone, Map
 from typing import TypeAlias
 
 
-Path: TypeAlias = list[tuple[Node | Connection, int]]
+PathStep: TypeAlias = tuple[Node | Connection, int]
+Path: TypeAlias = list[PathStep]
 
 
 class SimulationState:
