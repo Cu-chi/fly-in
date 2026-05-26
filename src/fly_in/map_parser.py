@@ -250,6 +250,8 @@ class MapParser():
                                   "format: 'connection: name1-name2'")
         name1: str = connection_split[0]
         name2: str = connection_split[1]
+        if name1 == name2:
+            raise MapParsingError(id, f"can't connect same node: '{name1}'")
         node1: Node | None = self._get_node_from_name(name1)
         node2: Node | None = self._get_node_from_name(name2)
         if not node1:
