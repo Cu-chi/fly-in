@@ -24,25 +24,48 @@ class VNode(pygame.sprite.Sprite):
 
         padding: int = 4
         size: int = self.radius * 2 + padding
-        self.image = pygame.Surface((size, size), pygame.SRCALPHA)
-        self.image.fill((0, 0, 0, 0))
+        self.original_image = pygame.Surface((size, size), pygame.SRCALPHA)
+        self.original_image.fill((0, 0, 0, 0))
 
         center: int = size // 2
-        pygame.gfxdraw.aacircle(self.image, center, center,
+        pygame.gfxdraw.aacircle(self.original_image, center, center,
                                 self.radius, self.color)
-        pygame.gfxdraw.filled_circle(self.image, center, center,
+        pygame.gfxdraw.filled_circle(self.original_image, center, center,
                                      self.radius, self.color)
 
+        self.original_text_surface = font.render(node.name,
+                                                 True, (255, 255, 255))
+
+        self.image = self.original_image.copy()
         self.rect = self.image.get_rect(center=(screen_x, screen_y))
-        self.text_surface = font.render(node.name,
-                                        True, (255, 255, 255))
+        self.text_surface = self.original_text_surface.copy()
         self.text_rect = self.text_surface.get_rect()
+        self.last_scale = 1.0
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.blit(self.image, self.rect)
         screen.blit(self.text_surface, self.text_rect)
 
-    def update(self, x: int, y: int) -> None:
+    def update(self, x: int, y: int, scale: float) -> None:
+        if scale != self.last_scale:
+            original_size = self.original_image.get_width()
+            new_size = int(original_size * scale)
+            new_size = max(1, new_size)
+            self.last_scale = scale
+            self.image = pygame.transform.smoothscale(self.original_image,
+                                                      (new_size, new_size))
+            self.rect = self.image.get_rect(center=(x, y))
+
+            original_width = self.original_text_surface.get_width()
+            original_height = self.original_text_surface.get_height()
+            new_width = int(original_width * scale)
+            new_height = int(original_height * scale)
+            new_size_w = max(1, new_width)
+            new_size_h = max(1, new_height)
+            self.last_scale = scale
+            self.text_surface = pygame.transform.smoothscale(
+                self.original_text_surface, (new_size_w, new_size_h))
+            self.text_rect = self.text_surface.get_rect(center=(x, y))
         self.rect.center = (x, y)
         self.text_rect.centerx = self.rect.centerx
         self.text_rect.bottom = self.rect.top
@@ -70,7 +93,7 @@ class VConnection(pygame.sprite.Sprite):
 
     def draw(self, surface: pygame.Surface, x1: int, y1: int,
              x2: int, y2: int, scale: float) -> None:
-        new_width: int = max(1, int(1 * scale))
+        new_width: int = max(1, int(10 * scale))
         self.mid_line = ((x1 + x2) // 2, (y1 + y2) // 2)
         self.text_rect.center = self.mid_line
         pygame.draw.line(surface, self.color,
@@ -83,15 +106,22 @@ class VDrone(pygame.sprite.Sprite):
                  screen_x: int, screen_y: int, *groups: Any):
         super().__init__(*groups)
 
-        self.image = pygame.image.load("src/fly_in/assets/drone.png")
-        self.image = pygame.transform.scale(self.image, (64, 64))
+        self.original_image = pygame.image.load("src/fly_in/assets/drone.png")
+        self.original_image = pygame.transform.scale(self.original_image,
+                                                     (64, 64))
+        self.image = self.original_image.copy()
         self.rect = self.image.get_rect(center=(screen_x, screen_y))
         self.position = position
+        self.last_scale = 1.0
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.blit(self.image, self.rect)
 
-    def update(self, x: int, y: int) -> None:
+    def update(self, x: int, y: int, scale: float) -> None:
+        if scale != self.last_scale:
+            self.last_scale = scale
+            self.image = pygame.transform.scale_by(self.original_image, scale)
+            self.rect = self.image.get_rect(center=(x, y))
         self.rect.center = (x, y)
 
 
@@ -169,7 +199,7 @@ class Visualizer():
 
             for vnode in self.vnodes.values():
                 x, y = self._normalize_pos(vnode.node)
-                vnode.update(x, y)
+                vnode.update(x, y, self.scale)
                 vnode.draw(self.screen)
 
             for drone_id, vdrone in enumerate(self.vdrones, start=1):
@@ -182,7 +212,7 @@ class Visualizer():
                     x1, y1 = self._normalize_pos(vdrone.position.node1)
                     x2, y2 = self._normalize_pos(vdrone.position.node2)
                     x, y = (x1 + x2) // 2, (y1 + y2) // 2
-                vdrone.update(x, y)
+                vdrone.update(x, y, self.scale)
                 vdrone.draw(self.screen)
 
             pygame.display.flip()
