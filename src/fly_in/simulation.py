@@ -126,12 +126,13 @@ class PathFinder:
 
                 cost: float = 1.0
                 restricted: int = 0
+                priority_bonus: float = 0.0
                 if dest_node.metadata.zone:
                     if dest_node.metadata.zone == Zone.RESTRICTED:
                         cost = 2.0
                         restricted = 1
                     elif dest_node.metadata.zone == Zone.PRIORITY:
-                        cost = 0.1
+                        priority_bonus = 0.5
 
                 if self.state.can_use_connection(conn, next_time) \
                     and self.state.can_enter_node(dest_node,
@@ -139,7 +140,7 @@ class PathFinder:
                     new_path = path + [(conn, next_time)] \
                         + [(dest_node, next_time + restricted)]
                     new_g = g_score + cost
-                    new_f = new_g + self._heuristic(dest_node)
+                    new_f = new_g + self._heuristic(dest_node) - priority_bonus
                     heapq.heappush(open_set,
                                    (new_f,
                                     next(counter),
