@@ -57,7 +57,7 @@ class PathFinder:
 
     def route_all_drones(self) -> None:
         for drone_id in range(1, self.map.nb_drones + 1):
-            path = self.find_path(drone_id)
+            path = self.find_path()
             if path:
                 self._reserve_path(drone_id, path)
                 self.drones_paths.update({
@@ -78,19 +78,19 @@ class PathFinder:
         return (abs(node.x - self.map.end_hub.x)
                 + abs(node.y - self.map.end_hub.y))
 
-    def find_path(self, drone_id: int) -> Path:
+    def find_path(self) -> Path:
         counter: itertools.count[int] = itertools.count()
 
         start_g = 0.0
         start_h = self._heuristic(self.map.start_hub)
         open_set: list[tuple[float, int, float, int, Node, Path]] = [
             (start_g + start_h, next(counter), start_g,
-             0, self.map.start_hub, [(self.map.start_hub, 0)])
+             -1, self.map.start_hub, [])
         ]
         visited = set()
 
         while open_set:
-            f_score, _, g_score, current_time, current_node, path = \
+            _, _, g_score, current_time, current_node, path = \
                 heapq.heappop(open_set)
 
             if current_node == self.map.end_hub:
