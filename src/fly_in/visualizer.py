@@ -72,33 +72,16 @@ class VNode(pygame.sprite.Sprite):
 
 
 class VConnection(pygame.sprite.Sprite):
-    def __init__(self, connection: Connection,
-                 font: pygame.font.Font, *groups: Any):
+    def __init__(self, connection: Connection, *groups: Any):
         super().__init__(*groups)
         self.connection = connection
-
         self.color = pygame.Color(255, 255, 255)
-        self.font = font
-        self.description = "0 drones"
-        self.text_surface = font.render(self.description,
-                                        True, (255, 255, 255))
-        self.text_rect = self.text_surface.get_rect()
-        self.mid_line: tuple[int, int] = (0, 0)
-
-    def update_text(self, text: str) -> None:
-        self.description = text
-        self.text_surface = self.font.render(self.description, True,
-                                             (255, 255, 255))
-        self.text_rect = self.text_surface.get_rect(center=self.mid_line)
 
     def draw(self, surface: pygame.Surface, x1: int, y1: int,
              x2: int, y2: int, scale: float) -> None:
         new_width: int = max(1, int(10 * scale))
-        self.mid_line = ((x1 + x2) // 2, (y1 + y2) // 2)
-        self.text_rect.center = self.mid_line
         pygame.draw.line(surface, self.color,
                          (x1, y1), (x2, y2), new_width)
-        surface.blit(self.text_surface, self.text_rect)
 
 
 class VDrone(pygame.sprite.Sprite):
@@ -108,7 +91,7 @@ class VDrone(pygame.sprite.Sprite):
 
         self.original_image = pygame.image.load("src/fly_in/assets/drone.png")
         self.original_image = pygame.transform.scale(self.original_image,
-                                                     (64, 64))
+                                                     (96, 96))
         self.image = self.original_image.copy()
         self.rect = self.image.get_rect(center=(screen_x, screen_y))
         self.position = position
@@ -153,7 +136,7 @@ class Visualizer():
             self.vnodes.update({hub.name: VNode(hub, x, y, self.font)})
 
         self.vconnections: list[VConnection] = [
-            VConnection(connection, self.font_small)
+            VConnection(connection)
             for connection in map.connections
         ]
         self.vdrones: list[VDrone] = [
