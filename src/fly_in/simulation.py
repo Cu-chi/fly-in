@@ -65,7 +65,6 @@ class PathFinder:
                 })
             else:
                 print("no path for ", drone_id)
-        pass
 
     def _reserve_path(self, drone_id: int,
                       path: Path) -> None:
