@@ -3,6 +3,9 @@ import pygame.gfxdraw
 from fly_in.map_parser import Map
 from fly_in.map_types import Node, Connection
 from typing import Any
+from fly_in.output import Output
+from fly_in.simulation import PathFinder
+from enum import Enum, auto
 
 
 class VNode(pygame.sprite.Sprite):
@@ -108,28 +111,185 @@ class VDrone(pygame.sprite.Sprite):
         self.rect.center = (x, y)
 
 
-class Visualizer():
-    def __init__(self, map: Map,
-                 drones_positions: list[dict[int, Node | Connection]]) -> None:
-        pygame.init()
-        video_info: pygame.display._VidInfo = pygame.display.Info()
-        pygame.display.set_caption("fly-in visualizer")
-        self.screen = pygame.display.set_mode(
-            (video_info.current_w // 2, video_info.current_h // 2),
-            pygame.RESIZABLE)
-        self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("Arial", 16)
-        self.font_small = pygame.font.SysFont("Arial", 10)
+class VExitState(Enum):
+    EXIT_ALL = auto()
+    SHOW_MENU = auto()
+    CONTINUE = auto()
 
+
+class VMenu(pygame.sprite.Sprite):
+    def __init__(self, maps: dict[str, dict[str, Map]], *groups: Any):
+        pygame.init()
+        self.screen = pygame.display.set_mode((0, 0), pygame.RESIZABLE)
+
+        self.font_title = pygame.font.SysFont("Segoe UI", 48, bold=True)
+        self.font_subtitle = pygame.font.SysFont("Segoe UI", 24)
+        self.font_button = pygame.font.SysFont("Segoe UI", 16, bold=True)
+
+        self.clock = pygame.time.Clock()
+        self.show_visu = False
+        self.show_menu = True
+
+        self.categories: dict[str, dict[str, Map]] = maps
+
+        self.selected_cat: str | None = None
+        self.selected_map_name: str | None = None
+        self.selected_map_data: Map | None = None
+
+        super().__init__(*groups)
+
+    def _draw_button(self, text: str, rect: pygame.Rect,
+                     is_hover: bool, is_selected: bool,
+                     is_action: bool = False) -> bool:
+
+        bg_color: tuple[int, int, int] = (30, 41, 59)
+        text_color: tuple[int, int, int] = (203, 213, 225)
+
+        if is_action:
+            bg_color = (16, 185, 129)
+            text_color = (255, 255, 255)
+        elif is_selected:
+            bg_color = (14, 165, 233)
+            text_color = (255, 255, 255)
+        elif is_hover:
+            bg_color = (56, 189, 248)
+            text_color = (15, 23, 42)
+
+        pygame.draw.rect(self.screen, bg_color, rect, border_radius=8)
+
+        txt_surf = self.font_button.render(text, True, text_color)
+        txt_rect = txt_surf.get_rect(center=rect.center)
+        self.screen.blit(txt_surf, txt_rect)
+
+        return is_hover
+
+    def run(self) -> None:
+        app_running = True
+
+        while app_running:
+            pygame.display.set_caption("Fly-in - Main Menu")
+
+            while self.show_menu:
+                screen_w, screen_h = self.screen.get_size()
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                mouse_clicked = False
+
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        return
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        mouse_clicked = True
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_ESCAPE:
+                            return
+
+                self.screen.fill((15, 23, 42))
+
+                title_surf = self.font_title.render(
+                    "FLY-IN", True, (248, 250, 252))
+                self.screen.blit(title_surf, (50, 50))
+
+                sub_surf = self.font_subtitle.render(
+                    "Select a map to start simulation", True, (148, 163, 184))
+                self.screen.blit(sub_surf, (50, 110))
+
+                cat_x, cat_y = 50, 200
+                for cat in self.categories.keys():
+                    rect = pygame.Rect(cat_x, cat_y, 250, 45)
+                    hover = rect.collidepoint(mouse_x, mouse_y)
+
+                    if hover and mouse_clicked:
+                        self.selected_cat = cat
+                        self.selected_map_name = None
+                        self.selected_map_data = None
+
+                    self._draw_button(cat, rect, hover,
+                                      self.selected_cat == cat)
+                    cat_y += 55
+
+                map_x, map_y = 350, 200
+                if self.selected_cat:
+                    for name, map_data in self.categories[self.selected_cat] \
+                       .items():
+                        rect = pygame.Rect(map_x, map_y, 350, 45)
+                        hover = rect.collidepoint(mouse_x, mouse_y)
+
+                        if hover and mouse_clicked:
+                            self.selected_map_name = name
+                            self.selected_map_data = map_data
+
+                        self._draw_button(name, rect, hover,
+                                          self.selected_map_name == name)
+                        map_y += 55
+
+                if self.selected_map_data:
+                    start_rect = pygame.Rect(screen_w - 300, screen_h - 120,
+                                             250, 60)
+                    hover = start_rect.collidepoint(mouse_x, mouse_y)
+
+                    if hover and mouse_clicked:
+                        self.show_menu = False
+                        self.show_visu = True
+
+                    self._draw_button("START SIMULATION", start_rect, hover,
+                                      False, is_action=True)
+
+                pygame.display.flip()
+                self.clock.tick(60)
+
+            if not self.show_visu:
+                break
+
+            if self.selected_map_data:
+                path_finder = PathFinder(self.selected_map_data)
+                path_finder.route_all_drones()
+
+                output = Output(path_finder.drones_paths)
+                drones_positions = output.generate_list_of_positions()
+
+                visualizer = Visualizer(self.screen,
+                                        self.selected_map_data,
+                                        drones_positions)
+
+                while self.show_visu:
+                    match visualizer.visualization():
+                        case VExitState.EXIT_ALL:
+                            self.show_menu = False
+                            self.show_visu = False
+                            app_running = False
+                        case VExitState.SHOW_MENU:
+                            self.show_menu = True
+                            self.show_visu = False
+                    pygame.display.flip()
+                    self.clock.tick(60)
+
+        pygame.quit()
+
+
+class Visualizer():
+    def __init__(self, screen: pygame.Surface, map: Map,
+                 drones_positions: list[dict[int, Node | Connection]]) -> None:
+        pygame.display.set_caption("Fly-in - Visualization")
+        self.font = pygame.font.SysFont("Segoe UI", 24, bold=True)
+        self.font_small = pygame.font.SysFont("Segoe UI", 16)
+        self.screen = screen
+
+        self.set_data(map, drones_positions)
+        self.running = True
+
+    def set_data(self, map: Map,
+                 drones_positions: list[dict[int, Node | Connection]]) -> None:
         self.vnodes: dict[str, VNode] = {}
         self.hubs = map.hubs
         self.connections = map.connections
         self.drones_positions = drones_positions
         self.norm_val = 240
         self.scale = 1.0
+        self.turn = 0
         self.offset_x = 0
         self.offset_y = 0
         self._center_and_fit_map()
+        self.mousedown = False
 
         for hub in map.hubs:
             x, y = self._normalize_pos(hub)
@@ -148,9 +308,6 @@ class Visualizer():
         pygame.time.set_timer(self.NEXT_TURN_EVENT,
                               500,
                               len(self.drones_positions) - 1)
-
-        self.turn = 0
-        self.running = True
 
     def _normalize_pos(self, node: Node) -> tuple[int, int]:
         return (int((node.x) * self.norm_val * self.scale) + self.offset_x,
@@ -191,55 +348,55 @@ class Visualizer():
         self.offset_y = (screen_h // 2) - int(center_y
                                               * self.norm_val * self.scale)
 
-    def run(self) -> None:
-        mousedown = False
-        while self.running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                if event.type == pygame.MOUSEWHEEL:
-                    scale_factor: int = event.y * 0.1
-                    if 0.1 < self.scale + scale_factor < 2.0:
-                        self.scale += scale_factor
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    mousedown = True
-                if event.type == pygame.MOUSEBUTTONUP:
-                    mousedown = False
-                if event.type == pygame.MOUSEMOTION and mousedown:
-                    self.offset_x += event.rel[0]
-                    self.offset_y += event.rel[1]
-                if event.type == self.NEXT_TURN_EVENT:
-                    self.turn += 1
-                if event.type == pygame.VIDEORESIZE:
-                    self._center_and_fit_map()
+    def visualization(self) -> VExitState:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return VExitState.EXIT_ALL
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    return VExitState.SHOW_MENU
+            if event.type == pygame.MOUSEWHEEL:
+                scale_factor: int = event.y * 0.1
+                if 0.1 < self.scale + scale_factor < 2.0:
+                    self.scale += scale_factor
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.mousedown = True
+            if event.type == pygame.MOUSEBUTTONUP:
+                self.mousedown = False
+            if event.type == pygame.MOUSEMOTION and self.mousedown:
+                self.offset_x += event.rel[0]
+                self.offset_y += event.rel[1]
+            if event.type == self.NEXT_TURN_EVENT:
+                self.turn += 1
+            if event.type == pygame.VIDEORESIZE:
+                self._center_and_fit_map()
 
-            self.screen.fill("#211e69")
+        self.screen.fill((15, 23, 42))
 
-            for vconnection in self.vconnections:
-                x1, y1 = self.\
-                    vnodes[vconnection.connection.node1.name].rect.center
-                x2, y2 = self.\
-                    vnodes[vconnection.connection.node2.name].rect.center
-                vconnection.draw(self.screen, x1, y1, x2, y2, self.scale)
+        for vconnection in self.vconnections:
+            x1, y1 = self.\
+                vnodes[vconnection.connection.node1.name].rect.center
+            x2, y2 = self.\
+                vnodes[vconnection.connection.node2.name].rect.center
+            vconnection.draw(self.screen, x1, y1, x2, y2, self.scale)
 
-            for vnode in self.vnodes.values():
-                x, y = self._normalize_pos(vnode.node)
-                vnode.update(x, y, self.scale)
-                vnode.draw(self.screen)
+        for vnode in self.vnodes.values():
+            x, y = self._normalize_pos(vnode.node)
+            vnode.update(x, y, self.scale)
+            vnode.draw(self.screen)
 
-            for drone_id, vdrone in enumerate(self.vdrones, start=1):
-                positions = self.drones_positions[self.turn]
-                if drone_id in positions:
-                    vdrone.position = positions[drone_id]
-                if isinstance(vdrone.position, Node):
-                    x, y = self._normalize_pos(vdrone.position)
-                elif isinstance(vdrone.position, Connection):
-                    x1, y1 = self._normalize_pos(vdrone.position.node1)
-                    x2, y2 = self._normalize_pos(vdrone.position.node2)
-                    x, y = (x1 + x2) // 2, (y1 + y2) // 2
-                vdrone.update(x, y, self.scale)
-                vdrone.draw(self.screen)
-
-            pygame.display.flip()
-            self.clock.tick(60)
-        pygame.quit()
+        for drone_id, vdrone in enumerate(self.vdrones, start=1):
+            positions = self.drones_positions[self.turn]
+            if drone_id in positions:
+                vdrone.position = positions[drone_id]
+            x: int = 0
+            y: int = 0
+            if isinstance(vdrone.position, Node):
+                x, y = self._normalize_pos(vdrone.position)
+            elif isinstance(vdrone.position, Connection):
+                x1, y1 = self._normalize_pos(vdrone.position.node1)
+                x2, y2 = self._normalize_pos(vdrone.position.node2)
+                x, y = (x1 + x2) // 2, (y1 + y2) // 2
+            vdrone.update(x, y, self.scale)
+            vdrone.draw(self.screen)
+        return VExitState.CONTINUE
