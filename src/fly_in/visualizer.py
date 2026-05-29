@@ -118,7 +118,7 @@ class VExitState(Enum):
 
 
 class VMenu(pygame.sprite.Sprite):
-    def __init__(self, maps: dict[str, Map], *groups):
+    def __init__(self, maps: dict[str, dict[str, Map]], *groups) -> None:
         pygame.init()
         self.screen = pygame.display.set_mode(
             (0, 0),
@@ -262,7 +262,7 @@ class Visualizer():
         self.offset_y = (screen_h // 2) - int(center_y
                                               * self.norm_val * self.scale)
 
-    def visualization(self) -> bool:
+    def visualization(self) -> VExitState:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return VExitState.EXIT_ALL

@@ -1,8 +1,7 @@
-from fly_in.map_parser import MapParser, MapParsingError, MapFolder
+from fly_in.map_parser import MapParsingError
+from fly_in.map_categorizer import MapCategorizer
 from fly_in.map_types import Map
-from fly_in.visualizer import Visualizer, VMenu
-from fly_in.simulation import PathFinder
-from fly_in.output import Output
+from fly_in.visualizer import VMenu
 
 
 def main() -> None:
@@ -21,8 +20,8 @@ def main() -> None:
 
         "maps/challenger/01_the_impossible_dream.txt",
     ]
-    maps = MapFolder("maps/")
-    valid_maps: dict[str, Map] = maps.get_valid_maps()
+    maps = MapCategorizer("maps/")
+    valid_maps: dict[str, dict[str, Map]] = maps.get_valid_maps()
     vmenu = VMenu(valid_maps)
     vmenu.run()
     return
